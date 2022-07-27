@@ -12,6 +12,9 @@ app.get("/", async (req, res) => {
   );
 });
 
+//dummy database
+let DB = [];
+
 //function that filters data by date range and returns object
 function filterData(data, range) {
   const from = new Date(range.from);
@@ -22,6 +25,41 @@ function filterData(data, range) {
       let date = new Date(item.created_at);
       return date >= from && date <= to;
     }),
+  };
+}
+
+//function to scrap orders
+function scrapOrder(order) {
+  return {
+    type: "orderdetails",
+    status: order.status == "Complete" ? "success" : order.status,
+    isError: false,
+    errorMessage: null,
+    data: {
+      orderId: order.id,
+      orderDate: order.created_at,
+      orderStatus: order.status,
+      items: order.order_deliveries[0]?.order_items.map((item) => ({
+        itemStatus: "Delivered",
+        itemTitle: item.item.name,
+        itemUnitPrice: item.item.price_affix || 0,
+        itemPackageUnit: item.item.size,
+        itemQuantity: item.qty,
+        itemPrice: item.item.price_affix * item.qty || 0,
+      })),
+      orderSummary: {
+        Item_Subtotal: order.total,
+        Sales_Tax: "0",
+        Tip: "0",
+        Service_Fee: "0",
+        Delivery_Fee: "0",
+        Total: order.total,
+      },
+      retailerName: order.order_deliveries[0]?.retailer.name,
+      orderType: "Delivery",
+      paymentMethod: "Paid with  Visa ",
+    },
+    message: "Page Scrapped Successfully",
   };
 }
 
@@ -57,6 +95,18 @@ app.get("/orders", async (req, res) => {
     .catch((err) => {
       res.status(400).send(err.response?.data);
     });
+});
+
+//posting scrapped data to dummy database
+
+app.post("/orders", (req, res) => {
+  const orders = req.body.orders;
+  if (orders?.length) {
+    DB = orders.map((order) => scrapOrder(order));
+    res.send({ scrapedOrders: DB });
+  } else {
+    res.status(404).send("No orders found");
+  }
 });
 
 //lisning on port
